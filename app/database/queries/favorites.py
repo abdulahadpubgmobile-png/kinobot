@@ -39,3 +39,14 @@ async def get_user_favorites(session: AsyncSession, user_id: int) -> List[Movie]
         .order_by(Favorite.added_at.desc())
     )
     return result.scalars().all()
+
+
+async def get_users_by_genre(session: AsyncSession, genre: str) -> List[int]:
+    """Berilgan janrli kinolarni sevimli qilgan foydalanuvchilar ID sini qaytaradi."""
+    result = await session.execute(
+        select(Favorite.user_id)
+        .join(Movie, Movie.id == Favorite.movie_id)
+        .where(Movie.genre.ilike(f"%{genre}%"))
+        .distinct()
+    )
+    return [row[0] for row in result.fetchall()]

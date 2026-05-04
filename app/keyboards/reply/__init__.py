@@ -8,7 +8,8 @@ def main_keyboard() -> ReplyKeyboardMarkup:
     kb.button(text="🔍 Qidirish")
     kb.button(text="🎭 Janrlar")
     kb.button(text="ℹ️ Yordam")
-    kb.adjust(2, 2)
+    kb.button(text="🎬 Sizga tavsiya")
+    kb.adjust(2, 2, 1)
     return kb.as_markup(resize_keyboard=True)
 
 

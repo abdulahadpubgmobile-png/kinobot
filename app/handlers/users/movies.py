@@ -1,3 +1,4 @@
+import asyncio
 import math
 from aiogram import Bot, Router, F
 from aiogram.types import Message, CallbackQuery
@@ -14,6 +15,8 @@ from app.database.queries.movies import (
 from app.database.queries.favorites import (
     is_favorite, add_favorite, remove_favorite, get_user_favorites,
 )
+from app.database.queries.ads import get_active_ads
+from app.database.queries.series import get_movie_next_part
 from app.keyboards.inline import movies_list_keyboard, genres_keyboard, movie_keyboard
 from app.keyboards.reply import main_keyboard, cancel_keyboard
 from app.states import SearchFSM
@@ -31,8 +34,49 @@ async def send_movie(message_or_callback, movie, session: AsyncSession, bot: Bot
     else:
         send = message_or_callback.message
 
+    # Reklamalarni chiqarish
+    ads = await get_active_ads(session)
+    if ads:
+        ad = ads[0]  # Birinchi faol reklamani olamiz
+        try:
+            from aiogram.utils.keyboard import InlineKeyboardBuilder
+            kb = InlineKeyboardBuilder()
+            if ad.button_text and ad.button_url:
+                kb.button(text=ad.button_text, url=ad.button_url)
+
+            if ad.media_type == "photo" and ad.media_file_id:
+                await send.answer_photo(
+                    photo=ad.media_file_id,
+                    caption=ad.text or "",
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup() if kb.buttons else None,
+                )
+            elif ad.media_type == "video" and ad.media_file_id:
+                await send.answer_video(
+                    video=ad.media_file_id,
+                    caption=ad.text or "",
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup() if kb.buttons else None,
+                )
+            elif ad.text:
+                await send.answer(
+                    ad.text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup() if kb.buttons else None,
+                )
+        except Exception as e:
+            import logging
+            logging.error(f"Reklama yuborishda xatolik: {e}")
+        # Kichik pauza
+        await asyncio.sleep(1)
+
     user_id = send.from_user.id if send.from_user else 0
     is_fav = await is_favorite(session, user_id, movie.id) if user_id else False
+
+    # Keyingi qismni tekshirish
+    next_part = None
+    if movie.series_id:
+        next_part = await get_movie_next_part(session, movie.id)
 
     if user_id:
         from app.database.queries.watch_history import add_watch_history
@@ -59,13 +103,37 @@ async def send_movie(message_or_callback, movie, session: AsyncSession, bot: Bot
     caption += "━━━━━━━━━━━━━━━━━━\n"
     caption += f"🤖 Bizning bot: <a href=\"{bot_link}\">{bot_username}</a>"
 
-    await send.answer_video(
-        video=movie.file_id,
-        caption=caption,
-        parse_mode="HTML",
-        reply_markup=movie_keyboard(movie, is_fav),
-        supports_streaming=True,
-    )
+    try:
+        await send.answer_video(
+            video=movie.file_id,
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=movie_keyboard(movie, is_fav, next_part),
+            supports_streaming=True,
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"Video yuborishda xatolik (movie id={movie.id}, file_id={movie.file_id}): {e}")
+        # Video bo'lmasa, poster bilan xabar yuborishga harakat qilamiz
+        if movie.poster_file_id:
+            try:
+                await send.answer_photo(
+                    photo=movie.poster_file_id,
+                    caption=caption + "\n\n⚠️ <b>Video yuklanmadi, faqat poster!</b>",
+                    parse_mode="HTML",
+                    reply_markup=movie_keyboard(movie, is_fav, next_part),
+                )
+                return
+            except Exception:
+                pass
+        await send.answer(
+            f"❌ <b>Kino yuklashda xatolik!</b>\n\n"
+            f"Kino: {movie.title}\n"
+            f"❗ Video fayli noto'g'ri saqlangan.\n"
+            f"Admin bilan bog'laning yoki boshqa kino tanlang.",
+            parse_mode="HTML",
+            reply_markup=main_keyboard(),
+        )
 
 
 @router.message(F.text & ~F.text.in_(SKIP), StateFilter(None))

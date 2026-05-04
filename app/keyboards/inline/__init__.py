@@ -7,7 +7,7 @@ from app.database.models import Movie
 MOVIES_PER_PAGE = 5
 
 
-def movie_keyboard(movie: Movie, is_fav: bool = False) -> InlineKeyboardMarkup:
+def movie_keyboard(movie: Movie, is_fav: bool = False, next_part: Movie = None) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if movie.trailer_url:
         kb.button(text="🎥 Trailer", url=movie.trailer_url)
@@ -15,10 +15,18 @@ def movie_keyboard(movie: Movie, is_fav: bool = False) -> InlineKeyboardMarkup:
     kb.button(text=f"👁 {movie.views}", callback_data="views_info")
     fav_text = "❤️ Sevimli" if is_fav else "🤍 Sevimlilarga"
     kb.button(text=fav_text, callback_data=f"fav_{movie.id}")
+    if next_part:
+        kb.button(text=f"➡️ Keyingi qism ({next_part.part_number})", callback_data=f"movie_{next_part.id}")
     if movie.trailer_url:
-        kb.adjust(2, 1, 2)
+        if next_part:
+            kb.adjust(2, 1, 2, 1)
+        else:
+            kb.adjust(2, 1, 2)
     else:
-        kb.adjust(1, 2)
+        if next_part:
+            kb.adjust(1, 2, 1)
+        else:
+            kb.adjust(1, 2)
     return kb.as_markup()
 
 
@@ -72,11 +80,13 @@ def admin_panel_keyboard() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🎬 Kino qo'shish", callback_data="admin_add_movie")
     kb.button(text="📊 Statistika", callback_data="admin_stats")
-    kb.button(text="📢 Broadcast", callback_data="admin_broadcast")
+    kb.button(text="📢 Reklama", callback_data="admin_ads")
+    kb.button(text="🎬 Serialar", callback_data="admin_series")
     kb.button(text="🗂 Barcha kinolar", callback_data="admin_movies_1")
     kb.button(text="📡 Kanallar", callback_data="admin_channels")
     kb.button(text="📥 Import (JSON)", callback_data="admin_import")
-    kb.adjust(2, 2, 2)
+    kb.button(text="📊 Import (CSV)", callback_data="admin_import_csv")
+    kb.adjust(2, 2, 2, 2)
     return kb.as_markup()
 
 

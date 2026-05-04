@@ -118,3 +118,48 @@ async def get_all_genres(session: AsyncSession) -> List[str]:
     result = await session.execute(select(Movie.genre).distinct())
     genres = [row[0] for row in result.fetchall() if row[0]]
     return genres
+
+
+async def get_recommendations(session: AsyncSession, user_id: int, limit: int = 10) -> List[Movie]:
+    """Foydalanuvchi ko'rgan va sevimli janrlarga asosan tavsiya berish."""
+    from app.database.queries.favorites import get_user_favorites
+    from app.database.queries.watch_history import get_user_history
+
+    # Foydalanuvchi ko'rgan kinolar
+    watched_movies = await get_user_history(session, user_id, limit=50)
+    watched_ids = [m.id for m in watched_movies]
+
+    # Foydalanuvchi sevimlilari
+    fav_movies = await get_user_favorites(session, user_id)
+    fav_ids = [m.id for m in fav_movies]
+
+    # Janrlarni yig'ish
+    genres = set()
+    for movie in watched_movies + fav_movies:
+        if movie.genre:
+            for g in movie.genre.split(","):
+                if g.strip():
+                    genres.add(g.strip())
+
+    if not genres:
+        # Agar janr topilmasa, eng ko'p ko'rilarni qaytarish
+        result = await session.execute(
+            select(Movie)
+            .where(Movie.id.notin_(watched_ids + fav_ids))
+            .order_by(Movie.views.desc())
+            .limit(limit)
+        )
+        return result.scalars().all()
+
+    # Janrlarga mos kinolarni olish
+    conditions = []
+    for genre in genres:
+        conditions.append(Movie.genre.ilike(f"%{genre}%"))
+
+    result = await session.execute(
+        select(Movie)
+        .where(or_(*conditions), Movie.id.notin_(watched_ids + fav_ids))
+        .order_by(Movie.views.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()

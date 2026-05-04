@@ -5,9 +5,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 
 from app.loader import bot, dp
-from app.database.db import create_tables
+from app.database.db import create_tables, async_session_maker
 from app.middlewares import ForceSubscribeMiddleware, AntiFloodMiddleware, DatabaseMiddleware
 from app.handlers import main_router
+from app.database.queries.ads import deactivate_expired_ads
 
 
 async def set_commands(bot: Bot) -> None:
@@ -21,6 +22,13 @@ async def set_commands(bot: Bot) -> None:
 
 async def on_startup(bot: Bot) -> None:
     await create_tables()
+
+    # Muddati o'tgan reklamalarni o'chiramiz
+    async with async_session_maker() as session:
+        expired = await deactivate_expired_ads(session)
+        if expired:
+            logging.info(f"📢 {expired} ta muddati o'tgan reklama o'chirildi")
+
     await set_commands(bot)
     logging.info("✅ Bot ishga tushdi!")
 

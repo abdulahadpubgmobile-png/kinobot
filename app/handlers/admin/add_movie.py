@@ -1,3 +1,4 @@
+import asyncio
 from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
@@ -8,6 +9,8 @@ from app.filters import IsAdmin
 from app.states import AddMovieFSM
 from app.database.queries.movies import add_movie, get_movie_by_code
 from app.database.queries.channels import get_all_channels
+from app.database.queries.favorites import get_users_by_genre
+from app.database.queries.series import get_all_series
 from app.database.models import Movie
 from app.keyboards.reply import cancel_keyboard, skip_keyboard, main_keyboard
 from app.keyboards.inline import confirm_keyboard
@@ -235,6 +238,17 @@ async def confirm_save(callback: CallbackQuery, state: FSMContext, session: Asyn
     # Kanalga post yuborish
     await post_to_channels(bot, movie, session)
 
+    # Bildirishnoma yuborish (background task)
+    if movie.genre:
+        # Foydalanuvchilarni topish
+        user_ids = set()
+        genres = [g.strip() for g in movie.genre.split(",") if g.strip()]
+        for genre in genres:
+            genre_users = await get_users_by_genre(session, genre)
+            user_ids.update(genre_users)
+        if user_ids:
+            asyncio.create_task(send_new_movie_notifications(bot, movie, user_ids))
+
 
 @router.callback_query(AddMovieFSM.waiting_for_confirm, F.data == "movie_confirm_edit")
 async def confirm_edit(callback: CallbackQuery, state: FSMContext) -> None:
@@ -249,3 +263,61 @@ async def confirm_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await callback.message.edit_text("❌ Bekor qilindi.")
     await callback.answer()
+
+
+async def send_new_movie_notifications(bot: Bot, movie: Movie, user_ids: set) -> None:
+    """Yangi kino qo'shilganda, berilgan foydalanuvchilarga xabar yuborish."""
+    if not user_ids:
+        return
+
+    # Bot haqida ma'lumot
+    me = await bot.get_me()
+    bot_username = f"@{me.username}"
+
+    # Xabar matni
+    text = f"🆕 <b>Yangi kino qo'shildi!</b>\n\n"
+    text += f"🎬 <b>{movie.title}</b>\n"
+    if movie.year:
+        text += f"📅 Yil: {movie.year}\n"
+    if movie.genre:
+        text += f"🎭 Janr: {movie.genre}\n"
+    text += f"📌 Kod: <code>{movie.code}</code>\n\n"
+    text += f"🤖 Bot: {bot_username}"
+
+    # Klaviatura
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🎬 Kinoni olish", url=f"https://t.me/{me.username}?start=movie_{movie.code}")
+    if movie.trailer_url:
+        kb.button(text="🎥 Trailer", url=movie.trailer_url)
+    kb.adjust(1)
+
+    # Har bir foydalanuvchiga yuborish
+    sent = 0
+    failed = 0
+    for user_id in user_ids:
+        try:
+            if movie.poster_file_id:
+                await bot.send_photo(
+                    chat_id=user_id,
+                    photo=movie.poster_file_id,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+            else:
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+            sent += 1
+            await asyncio.sleep(0.05)  # Telegram limitlari
+        except Exception as e:
+            failed += 1
+            import logging
+            logging.warning(f"Foydalanuvchi {user_id} ga xabar yuborib bo'lmadi: {e}")
+
+    import logging
+    logging.info(f"🆕 Yangi kino '{movie.title}' uchun {sent} ta xabar yuborildi ({failed} ta xato)")
