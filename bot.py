@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
@@ -11,25 +13,46 @@ from app.handlers import main_router
 from app.database.queries.ads import deactivate_expired_ads
 
 
-async def set_commands(bot: Bot) -> None:
-    commands = [
-        BotCommand(command="start", description="Botni ishga tushirish"),
-        BotCommand(command="help", description="Yordam"),
-        BotCommand(command="admin", description="Admin panel (adminlar uchun)"),
-    ]
-    await bot.set_my_commands(commands)
+# ─── RENDER UCHUN HEALTH SERVER ──────────────────────────
 
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK - KinoBot ishlayapti!")
+
+    def log_message(self, *args):
+        pass
+
+
+def run_health_server():
+    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
+    server.serve_forever()
+
+
+# ─── STARTUP / SHUTDOWN ──────────────────────────────────
 
 async def on_startup(bot: Bot) -> None:
     await create_tables()
 
-    # Muddati o'tgan reklamalarni o'chiramiz
     async with async_session_maker() as session:
-        expired = await deactivate_expired_ads(session)
-        if expired:
-            logging.info(f"📢 {expired} ta muddati o'tgan reklama o'chirildi")
+        try:
+            expired = await deactivate_expired_ads(session)
+            if expired:
+                logging.info(f"📢 {expired} ta muddati o'tgan reklama o'chirildi")
+        except Exception as e:
+            logging.warning(f"Ads tekshirishda xato: {e}")
 
-    await set_commands(bot)
+    # set_my_commands — xato bo'lsa bot to'xtamasin
+    try:
+        await bot.set_my_commands([
+            BotCommand(command="start", description="Botni ishga tushirish"),
+            BotCommand(command="help", description="Yordam"),
+            BotCommand(command="admin", description="Admin panel"),
+        ])
+    except Exception as e:
+        logging.warning(f"set_my_commands xatosi (muhim emas): {e}")
+
     logging.info("✅ Bot ishga tushdi!")
 
 
@@ -38,11 +61,18 @@ async def on_shutdown(bot: Bot) -> None:
     await bot.session.close()
 
 
+# ─── MAIN ────────────────────────────────────────────────
+
 async def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     )
+
+    # Render health server — port 8080
+    thread = threading.Thread(target=run_health_server, daemon=True)
+    thread.start()
+    logging.info("🌐 Health server 8080 portda ishga tushdi")
 
     # Middlewares
     dp.message.middleware(DatabaseMiddleware())
@@ -59,7 +89,11 @@ async def main() -> None:
     dp.shutdown.register(on_shutdown)
 
     # Polling
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    await dp.start_polling(
+        bot,
+        allowed_updates=dp.resolve_used_update_types(),
+        drop_pending_updates=True,
+    )
 
 
 if __name__ == "__main__":
