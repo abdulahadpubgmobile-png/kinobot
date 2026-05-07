@@ -22,7 +22,11 @@ class Config:
         admins_raw = os.getenv("ADMINS", "")
         admins = [int(a.strip()) for a in admins_raw.split(",") if a.strip()]
 
-        db_url = os.getenv("DB_URL", "sqlite+aiosqlite:///./kinobot.db")
+        # Render avtomatik DATABASE_URL beradi, agar bo'lmasa DB_URL yoki SQLite
+        db_url = os.getenv("DATABASE_URL") or os.getenv("DB_URL", "sqlite+aiosqlite:///./kinobot.db")
+        # Render PostgreSQL URL ini SQLAlchemy formatiga o'tkazish (postgres:// -> postgresql+asyncpg://)
+        if db_url and db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
 
         channels_raw = os.getenv("CHANNELS", "")
         channels = [int(c.strip()) for c in channels_raw.split(",") if c.strip()]

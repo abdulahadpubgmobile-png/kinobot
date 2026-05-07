@@ -3,5 +3,4 @@ sqlalchemy>=2.0.36
 aiosqlite>=0.20.0
 python-dotenv>=1.0.1
 alembic>=1.14.0
-# asyncpg faqat PostgreSQL ishlatilganda kerak bo'ladi
-# PostgreSQL uchun: pip install asyncpg
+asyncpg>=0.30.0

@@ -4,7 +4,7 @@ AIogram 3 asosida yozilgan, clean architecture bilan professional Telegram kino 
 
 ---
 
-## 🚀 O'rnatish
+## 🚀 O'rnatish (Lokal)
 
 ### 1. Repository clone qilish
 
@@ -47,6 +47,72 @@ CHANNELS=-1001234567890
 ```bash
 python bot.py
 ```
+
+---
+
+## ☁️ Render.com da Deploy Qilish (Bepul va Ma'lumotlar Saqlanadi)
+
+Render.com da **PostgreSQL** ishlatib, ma'lumotlaringizni abadiy saqlashingiz mumkin.
+
+### 1. GitHub ga yuklash
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/yourname/kinobot.git
+git push -u origin main
+```
+
+### 2. Render.com da account yaratish
+
+1. [Render.com](https://render.com) ga kiring va "Get Started for Free" tugmasini bosing
+2. GitHub hisobingiz bilan kiring
+
+### 3. PostgreSQL ma'lumotlar bazasini yaratish
+
+1. Render panelida **"New +"** tugmasini bosing
+2. **"PostgreSQL"** ni tanlang
+3. Sozlamalar:
+   - **Name**: `kinobot-db`
+   - **Database**: `kinobot`
+   - **User**: `kinobot`
+   - **Region**: eng yaqin joyni tanlang
+   - **PostgreSQL Version**: default
+4. **"Create Database"** tugmasini bosing
+5. Ma'lumotlar bazasi yaratilgandan so'ng, **"Connection String"** ni ko'chirib oling (keyin kerak bo'ladi)
+
+### 4. Web Service yaratish
+
+1. Render panelida **"New +"** tugmasini bosing
+2. **"Web Service"** ni tanlang
+3. GitHub repozitoriyangizni tanlang (`kinobot`)
+4. Sozlamalar:
+   - **Name**: `kinobot`
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `python bot.py`
+5. **Environment Variables** qismiga quyidagilarni qo'shing:
+   - `BOT_TOKEN` = Telegram BotFather dan olgan tokeningiz
+   - `ADMINS` = Admin Telegram ID laringiz (vergul bilan)
+   - `CHANNELS` = Majburiy obuna kanallari ID lari (vergul bilan, masalan: `-1001234567890`)
+   - `DATABASE_URL` = (3-bosqichda olgan Connection String, `postgresql+asyncpg://...` ko'rinishida bo'lishi kerak)
+6. **"Create Web Service"** tugmasini bosing
+
+### 5. Avtomatik Deploy (render.yaml bilan)
+
+Agar `render.yaml` fayli repozitoriyada bo'lsa, Render avtomatik ravishda:
+- Web Service yaratadi
+- PostgreSQL bazasini yaratadi
+- `DATABASE_URL` ni avtomatik ulaydi
+
+Shunchaki GitHub ga push qiling va Renderda "New +" -> "Blueprint" ni tanlang, repozitoriyani tanlang.
+
+### ⚠️ Muhim eslatma
+
+- **SQLite** (sqlite+aiosqlite://) faqat lokal kompyuterda ishlatilsin
+- **Render.com da SQLite ishlamaydi** — har qayta ishga tushganda barcha ma'lumotlar o'chib ketadi!
+- **PostgreSQL** ishlating — Render bepul PostgreSQL beradi va ma'lumotlar saqlanadi
 
 ---
 
