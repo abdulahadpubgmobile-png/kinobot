@@ -190,4 +190,4 @@ kinobot/
 
 ## 📞 Muallif
 
-Loyiha [KinoBot] tomonidan yaratilgan.
+Loyiha [https://t.me/@ahadbek00] tomonidan yaratilgan.

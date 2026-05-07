@@ -1,6 +1,10 @@
 aiogram>=3.13.0
 sqlalchemy>=2.0.36
 aiosqlite>=0.20.0
+asyncpg>=0.30.0
 python-dotenv>=1.0.1
 alembic>=1.14.0
+<<<<<<< HEAD
 asyncpg>=0.30.0
+=======
+>>>>>>> ae9c370413fa5b1c2b5b10fa9f7ac5c489d43304
