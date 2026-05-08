@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import threading
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from aiogram import Bot, Dispatcher
@@ -26,7 +27,8 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def run_health_server():
-    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
+    port = int(os.getenv("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
     server.serve_forever()
 
 
